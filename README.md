@@ -155,9 +155,9 @@ MIT License - ver [LICENSE](LICENSE) para más detalles.
 
 ## 📧 Contacto
 
-- **Autor**: Tu Nombre
-- **Email**: tu.email@ejemplo.com
-- **LinkedIn**: [tu-perfil](https://linkedin.com/in/tu-perfil)
+- **Autor**: Paulo Villarroel
+- **Email**: paulo@hazlacondatos.com
+- **LinkedIn**: [tu-perfil](https://linkedin.com/in/paulovillarroel)
 
 ---
 
