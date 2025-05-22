@@ -10,6 +10,35 @@ Análisis automatizado de fondos de inversión de Fintual utilizando su API púb
 - **Reporte profesional** en formato Quarto/HTML
 - **Métricas financieras** estándar (Sharpe, drawdown, etc.)
 
+## 🤖 Análisis con IA Generativa
+
+Este reporte está optimizado para ser analizado por modelos de lenguaje (LLMs) como Claude, ChatGPT, Gemini, etc. El documento incluye:
+
+- Métricas estructuradas en formato fácil de procesar
+- Descripciones detalladas de cada gráfico y análisis
+- Contexto completo para interpretación automatizada
+- Datos organizados específicamente para análisis por IA
+
+## 🎯 Prompt Recomendado
+
+Para obtener el mejor análisis, usa el siguiente prompt con tu LLM preferido:
+
+```
+Eres un experto analista financiero. Analiza este reporte detenidamente, dame un resumen y dame recomendaciones. Complementa el análisis, estrategia y comparación histórica con lo disponible en sitio oficial de Fintual respecto del fondo.
+Reporte: https://paulovillarroel.quarto.pub/analisis-fintual/
+Docs Fondo Fintual: https://fintual.cl/risky-norris
+```
+
+Nota: Este ejemplo está ajustado específicamente al Fondo Risky Norris. Para otros fondos, modifica la URL de documentación correspondiente.
+
+## 💡 Beneficios del Análisis por IA
+
+- Interpretación objetiva de métricas y tendencias
+- Comparación automática con benchmarks del mercado
+- Recomendaciones personalizadas según perfil de riesgo
+- Análisis integral combinando datos cuantitativos y contexto del fondo
+- Identificación de patrones no evidentes en análisis manual
+
 ## 📁 Estructura del Proyecto
 
 ```
@@ -24,6 +53,7 @@ fintual-api/
 ## 🛠️ Requisitos
 
 ### R Packages
+
 ```r
 # Paquetes requeridos
 install.packages(c(
@@ -43,24 +73,28 @@ install.packages(c(
 ```
 
 ### Software
+
 - **R** (>= 4.0.0)
 - **Quarto** CLI
 
 ## 🏃‍♂️ Uso Rápido
 
 ### 1. Clonar el repositorio
+
 ```bash
 git clone https://github.com/paulovillarroel/fintual-api.git
 cd fintual-api
 ```
 
 ### 2. Ejecutar análisis
+
 ```r
 # En R 
 source("api-req.R")    # Obtiene los datos
 ```
 
 ### 3. Generar reporte
+
 ```bash
 # Desde terminal
 quarto render reporte.qmd
@@ -72,6 +106,7 @@ quarto::quarto_render("reporte.qmd")
 ## 📊 Análisis Incluidos
 
 ### Métricas Principales
+
 - Retorno total y promedio diario
 - Volatilidad diaria y anualizada
 - Ratio Sharpe aproximado
@@ -79,6 +114,7 @@ quarto::quarto_render("reporte.qmd")
 - Análisis de tendencia
 
 ### Visualizaciones
+
 - Evolución del valor cuota con medias móviles
 - Retornos diarios (gráfico de barras)
 - Retorno acumulado
@@ -86,6 +122,7 @@ quarto::quarto_render("reporte.qmd")
 - Volatilidad móvil
 
 ### Evaluación de Riesgo
+
 - Comparación con benchmarks de volatilidad
 - Análisis de días con movimientos significativos
 - Performance mensual detallada
@@ -93,7 +130,9 @@ quarto::quarto_render("reporte.qmd")
 ## ⚙️ Configuración
 
 ### Personalizar fechas y activo
+
 En `api-req.R`:
+
 ```r
 # Modificar estos parámetros
 fecha_inicio <- "2025-01-01"
@@ -102,7 +141,9 @@ asset_id <- 188  # ID del fondo Fintual. Puedes encontrarlos en https://fintuali
 ```
 
 ### API de Fintual
+
 El proyecto utiliza el endpoint público:
+
 ```
 https://fintual.cl/api/real_assets/{asset_id}/days?from_date={fecha_inicio}&to_date={fecha_fin}
 ```
@@ -110,6 +151,7 @@ https://fintual.cl/api/real_assets/{asset_id}/days?from_date={fecha_inicio}&to_d
 ## 📈 Ejemplo de Output
 
 El reporte genera métricas como:
+
 - **Retorno Total**: +12.5%
 - **Volatilidad Anualizada**: 18.2%
 - **Ratio Sharpe**: 1.24
@@ -118,6 +160,7 @@ El reporte genera métricas como:
 ## 🔧 Personalización
 
 ### Añadir nuevas métricas
+
 ```r
 # En data-prep chunk del .qmd
 df_analysis <- df_analysis %>%
@@ -128,6 +171,7 @@ df_analysis <- df_analysis %>%
 ```
 
 ### Modificar visualizaciones
+
 Los gráficos están construidos con `ggplot2` y son fácilmente personalizables modificando los chunks correspondientes en `reporte.qmd`.
 
 ## 🤝 Contribuir
