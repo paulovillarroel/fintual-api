@@ -26,12 +26,8 @@ library(scales)
 library(lubridate)
 library(gridExtra)
 library(knitr)
-
+library(purrr)
 ```
-
-## Resumen Ejecutivo
-
-Este análisis examina la evolución del valor cuota de un fondo de Fintual (para **Risky Norris**: casi solamente ETFs accionarios) durante el período analizado, evaluando su rendimiento, volatilidad y comportamiento como instrumento de alto riesgo.
 
 ```{r load-data}
 # Cargar datos desde archivo externo
@@ -51,12 +47,16 @@ cat(
 )
 ```
 
+## Resumen Ejecutivo
 
+Este análisis examina la evolución del valor cuota del **Fondo Risky Norris** de Fintual durante el período analizado, evaluando su rendimiento, volatilidad y comportamiento como instrumento de alto riesgo.
+
+**CONTEXTO DEL ANÁLISIS:** Este reporte analiza un fondo de inversión de alto riesgo durante `r as.numeric(as.Date(end_date) - as.Date(start_date))` días, incluyendo métricas de rendimiento, volatilidad y evaluación de riesgo para generar recomendaciones de inversión.
 
 ```{r data-prep}
 # Calcular métricas de análisis
-df_analysis <- df |>
-  arrange(date) |>
+df_analysis <- df %>%
+  arrange(date) %>%
   mutate(
     # Retornos diarios
     daily_return = (price - lag(price)) / lag(price) * 100,
@@ -84,14 +84,161 @@ total_return <- (end_price / start_price - 1) * 100
 avg_daily_return <- mean(df_analysis$daily_return, na.rm = TRUE)
 volatility <- sd(df_analysis$daily_return, na.rm = TRUE)
 sharpe_approx <- avg_daily_return / volatility * sqrt(252)
-max_price <- max(df_analysis$price, na.rm = TRUE)
-min_price <- min(df_analysis$price, na.rm = TRUE)
+max_price <- max(df_analysis$price, na_rm = TRUE)
+min_price <- min(df_analysis$price, na_rm = TRUE)
 max_drawdown <- min(df_analysis$cumulative_return, na.rm = TRUE)
+current_annual_vol <- volatility * sqrt(252)
+
+# Análisis de tendencia
+lm_model <- lm(price ~ as.numeric(date), data = df_analysis)
+slope_daily <- coef(lm_model)[2]
+slope_monthly <- slope_daily * 30
+trend_direction <- ifelse(slope_daily > 0, "ALCISTA", "BAJISTA")
+
+# Análisis de volatilidad por períodos
+vol_periods <- df_analysis %>%
+  mutate(month = floor_date(date, "month")) %>%
+  group_by(month) %>%
+  summarise(
+    monthly_vol = sd(daily_return, na.rm = TRUE),
+    monthly_return = (last(price) / first(price) - 1) * 100,
+    .groups = "drop"
+  )
+
+avg_monthly_vol <- mean(vol_periods$monthly_vol, na.rm = TRUE)
+
+# Días con movimientos significativos
+significant_moves <- df_analysis %>%
+  filter(abs(daily_return) > 2) %>%
+  nrow()
+```
+
+## Datos Estructurados para Análisis - Métricas Principales
+
+```{r metrics-for-ai}
+# Crear estructura de datos para IA
+ai_metrics <- list(
+  # Información básica
+  basic_info = list(
+    fund_name = "Risky Norris",
+    fund_id = 188,
+    analysis_period_days = as.numeric(as.Date(end_date) - as.Date(start_date)),
+    start_date = start_date,
+    end_date = end_date,
+    total_observations = nrow(df_analysis)
+  ),
+
+  # Métricas de rendimiento
+  performance = list(
+    start_price_clp = round(start_price, 2),
+    end_price_clp = round(end_price, 2),
+    total_return_percent = round(total_return, 3),
+    avg_daily_return_percent = round(avg_daily_return, 4),
+    best_day_return = round(max(df_analysis$daily_return, na.rm = TRUE), 2),
+    worst_day_return = round(min(df_analysis$daily_return, na.rm = TRUE), 2),
+    positive_days = sum(df_analysis$daily_return > 0, na.rm = TRUE),
+    negative_days = sum(df_analysis$daily_return < 0, na.rm = TRUE),
+    neutral_days = sum(df_analysis$daily_return == 0, na.rm = TRUE)
+  ),
+
+  # Métricas de riesgo
+  risk = list(
+    daily_volatility_percent = round(volatility, 4),
+    annualized_volatility_percent = round(current_annual_vol, 2),
+    max_drawdown_percent = round(max_drawdown, 2),
+    sharpe_ratio_approx = round(sharpe_approx, 3),
+    days_with_significant_moves = significant_moves,
+    significant_moves_frequency_percent = round(
+      significant_moves / nrow(df_analysis) * 100,
+      2
+    )
+  ),
+
+  # Análisis de tendencia
+  trend = list(
+    overall_direction = trend_direction,
+    daily_price_change_clp = round(slope_daily, 4),
+    monthly_price_change_clp = round(slope_monthly, 2),
+    price_range_min_clp = round(min_price, 2),
+    price_range_max_clp = round(max_price, 2),
+    price_range_amplitude_percent = round(
+      (max_price - min_price) / min_price * 100,
+      2
+    )
+  )
+)
+```
+```{r metrics, echo=FALSE}
+# Mostrar métricas estructuradas para análisis por IA
+cat("📊 INFORMACIÓN BÁSICA:\n")
+cat("- Fondo:", ai_metrics$basic_info$fund_name, "\n")
+cat("- ID Fondo:", ai_metrics$basic_info$fund_id, "\n")
+cat("- Período:", ai_metrics$basic_info$analysis_period_days, "días\n")
+cat("- Observaciones:", ai_metrics$basic_info$total_observations, "\n\n")
+
+cat("📈 RENDIMIENTO:\n")
+cat("- Retorno total:", ai_metrics$performance$total_return_percent, "%\n")
+cat(
+  "- Retorno diario promedio:",
+  ai_metrics$performance$avg_daily_return_percent,
+  "%\n"
+)
+cat("- Mejor día:", ai_metrics$performance$best_day_return, "%\n")
+cat("- Peor día:", ai_metrics$performance$worst_day_return, "%\n")
+cat(
+  "- Días positivos:",
+  ai_metrics$performance$positive_days,
+  "| Días negativos:",
+  ai_metrics$performance$negative_days,
+  "\n\n"
+)
+
+cat("⚠️ RIESGO:\n")
+cat("- Volatilidad diaria:", ai_metrics$risk$daily_volatility_percent, "%\n")
+cat(
+  "- Volatilidad anualizada:",
+  ai_metrics$risk$annualized_volatility_percent,
+  "%\n"
+)
+cat("- Máximo drawdown:", ai_metrics$risk$max_drawdown_percent, "%\n")
+cat("- Ratio Sharpe aproximado:", ai_metrics$risk$sharpe_ratio_approx, "\n")
+cat(
+  "- Movimientos significativos:",
+  ai_metrics$risk$significant_moves_frequency_percent,
+  "% de los días\n\n"
+)
+
+cat("📊 TENDENCIA:\n")
+cat("- Dirección general:", ai_metrics$trend$overall_direction, "\n")
+cat(
+  "- Cambio diario promedio:",
+  ai_metrics$trend$daily_price_change_clp,
+  "CLP\n"
+)
+cat(
+  "- Cambio mensual promedio:",
+  ai_metrics$trend$monthly_price_change_clp,
+  "CLP\n"
+)
+cat(
+  "- Rango de precios:",
+  ai_metrics$trend$price_range_min_clp,
+  "-",
+  ai_metrics$trend$price_range_max_clp,
+  "CLP\n"
+)
+cat(
+  "- Amplitud del rango:",
+  ai_metrics$trend$price_range_amplitude_percent,
+  "%\n"
+)
 ```
 
 ## 1. Evolución del Valor Cuota
 
-```{r price-evolution, fig.cap="Evolución del valor cuota con medias móviles y tendencia general"}
+**DESCRIPCIÓN PARA IA:** Este gráfico muestra la evolución temporal del precio del fondo Risky Norris con medias móviles de 7 y 30 días, más una línea de tendencia general. Permite identificar patrones, tendencias y puntos de inflexión importantes en el período analizado.
+
+```{r price-evolution, fig.cap="GRÁFICO PRINCIPAL: Evolución del valor cuota con indicadores técnicos. Línea azul = precio diario, línea rosada = media móvil 7 días, línea naranja = media móvil 30 días, línea roja = tendencia general"}
 ggplot(df_analysis, aes(x = date, y = price)) +
   geom_line(color = "#2E86AB", size = 1.2, alpha = 0.8) +
   geom_line(
@@ -118,8 +265,13 @@ ggplot(df_analysis, aes(x = date, y = price)) +
   scale_y_continuous(labels = scales::comma_format()) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
   labs(
-    title = "Evolución del Valor Cuota",
-    subtitle = paste0("Período: ", min(df$date), " - ", max(df$date)),
+    title = "Evolución del Valor Cuota - Fondo Risky Norris",
+    subtitle = paste0(
+      "Período: ",
+      format(as.Date(start_date), "%d/%m/%Y"),
+      " - ",
+      format(as.Date(end_date), "%d/%m/%Y")
+    ),
     x = "Fecha",
     y = "Valor Cuota (CLP)",
     caption = "Líneas: Precio (azul), MA 7 días (rosado), MA 30 días (naranja), Tendencia (rojo)"
@@ -137,14 +289,16 @@ ggplot(df_analysis, aes(x = date, y = price)) +
 
 ### 2.1 Retornos Diarios
 
-```{r daily-returns, fig.cap="Retornos diarios del fondo"}
+**DESCRIPCIÓN PARA IA:** Gráfico de barras que muestra los retornos diarios del fondo. Barras verdes indican días con retornos positivos, barras rojas días con retornos negativos. Permite identificar volatilidad, clusters de volatilidad y días con movimientos excepcionales.
+
+```{r daily-returns, fig.cap="RETORNOS DIARIOS: Barras verdes = días positivos, barras rojas = días negativos. Permite identificar períodos de alta volatilidad y movimientos excepcionales"}
 ggplot(df_analysis, aes(x = date, y = daily_return)) +
   geom_hline(yintercept = 0, color = "gray50", linetype = "dashed") +
   geom_col(aes(fill = daily_return > 0), alpha = 0.7) +
   scale_fill_manual(values = c("TRUE" = "#27AE60", "FALSE" = "#E74C3C")) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
   labs(
-    title = "Retornos Diarios",
+    title = "Retornos Diarios - Fondo Risky Norris",
     x = "Fecha",
     y = "Retorno Diario (%)"
   ) +
@@ -158,14 +312,16 @@ ggplot(df_analysis, aes(x = date, y = daily_return)) +
 
 ### 2.2 Retorno Acumulado
 
-```{r cumulative-returns, fig.cap="Evolución del retorno acumulado"}
+**DESCRIPCIÓN PARA IA:** Muestra la evolución del retorno acumulado del fondo desde el inicio del período. Permite evaluar la performance total y identificar períodos de ganancia o pérdida sostenida.
+
+```{r cumulative-returns, fig.cap="RETORNO ACUMULADO: Evolución de la performance total del fondo desde el inicio del período de análisis"}
 ggplot(df_analysis, aes(x = date, y = cumulative_return)) +
   geom_hline(yintercept = 0, color = "gray50", linetype = "dashed") +
   geom_line(color = "#8E44AD", size = 1.2) +
   geom_area(alpha = 0.2, fill = "#8E44AD") +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
   labs(
-    title = "Retorno Acumulado",
+    title = "Retorno Acumulado - Fondo Risky Norris",
     x = "Fecha",
     y = "Retorno Acumulado (%)"
   ) +
@@ -180,7 +336,9 @@ ggplot(df_analysis, aes(x = date, y = cumulative_return)) +
 
 ### 3.1 Distribución de Retornos
 
-```{r returns-distribution, fig.cap="Distribución de los retornos diarios"}
+**DESCRIPCIÓN PARA IA:** Histograma que muestra la distribución de los retornos diarios. La línea naranja indica la media de retornos. Permite evaluar la simetría de la distribución, identificar sesgos y evaluar la normalidad de los retornos.
+
+```{r returns-distribution, fig.cap="DISTRIBUCIÓN DE RETORNOS: Histograma de retornos diarios. Línea naranja = media. Permite evaluar simetría, sesgos y normalidad de los retornos"}
 ggplot(df_analysis, aes(x = daily_return)) +
   geom_histogram(bins = 30, fill = "#34495E", alpha = 0.7, color = "white") +
   geom_vline(
@@ -191,7 +349,7 @@ ggplot(df_analysis, aes(x = daily_return)) +
   ) +
   geom_vline(xintercept = 0, color = "gray50", linetype = "dashed") +
   labs(
-    title = "Distribución de Retornos Diarios",
+    title = "Distribución de Retornos Diarios - Fondo Risky Norris",
     x = "Retorno Diario (%)",
     y = "Frecuencia",
     caption = "Línea naranja: Media de retornos"
@@ -201,13 +359,15 @@ ggplot(df_analysis, aes(x = daily_return)) +
 
 ### 3.2 Volatilidad Móvil
 
-```{r volatility-evolution, fig.cap="Evolución de la volatilidad móvil (7 días)"}
+**DESCRIPCIÓN PARA IA:** Muestra la evolución de la volatilidad móvil de 7 días a lo largo del tiempo. Permite identificar períodos de alta y baja volatilidad, y tendencias en el riesgo del fondo.
+
+```{r volatility-evolution, fig.cap="VOLATILIDAD MÓVIL: Evolución de la volatilidad de 7 días. Identifica períodos de alta/baja volatilidad y tendencias en el riesgo"}
 ggplot(df_analysis, aes(x = date, y = volatility_7d)) +
   geom_line(color = "#E74C3C", size = 1) +
   geom_smooth(method = "loess", color = "#3498DB", alpha = 0.3) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
   labs(
-    title = "Volatilidad Móvil (7 días)",
+    title = "Volatilidad Móvil (7 días) - Fondo Risky Norris",
     x = "Fecha",
     y = "Volatilidad (%)"
   ) +
@@ -220,31 +380,7 @@ ggplot(df_analysis, aes(x = date, y = volatility_7d)) +
 
 ## 4. Métricas Clave
 
-```{r metrics-calculation}
-# Cálculo de métricas adicionales
-lm_model <- lm(price ~ as.numeric(date), data = df_analysis)
-slope_daily <- coef(lm_model)[2]
-slope_monthly <- slope_daily * 30
-trend_direction <- ifelse(slope_daily > 0, "ALCISTA", "BAJISTA")
-
-# Análisis de volatilidad por períodos
-vol_periods <- df_analysis |>
-  mutate(month = floor_date(date, "month")) |>
-  group_by(month) |>
-  summarise(
-    monthly_vol = sd(daily_return, na.rm = TRUE),
-    monthly_return = (last(price) / first(price) - 1) * 100,
-    .groups = "drop"
-  )
-
-avg_monthly_vol <- mean(vol_periods$monthly_vol, na.rm = TRUE)
-current_annual_vol <- volatility * sqrt(252)
-
-# Días con movimientos significativos
-significant_moves <- df_analysis |>
-  filter(abs(daily_return) > 2) |>
-  nrow()
-
+```{r metrics-table}
 # Crear tabla de métricas
 metrics_table <- data.frame(
   Métrica = c(
@@ -258,7 +394,9 @@ metrics_table <- data.frame(
     "Máximo Drawdown (%)",
     "Tendencia General",
     "Cambio Promedio Mensual (CLP)",
-    "Días con Movimientos >2%"
+    "Días con Movimientos >2%",
+    "Mejor Día (%)",
+    "Peor Día (%)"
   ),
   Valor = c(
     format(round(start_price), big.mark = ","),
@@ -276,60 +414,57 @@ metrics_table <- data.frame(
       significant_moves,
       nrow(df_analysis),
       significant_moves / nrow(df_analysis) * 100
-    )
+    ),
+    sprintf("%.2f", max(df_analysis$daily_return, na.rm = TRUE)),
+    sprintf("%.2f", min(df_analysis$daily_return, na.rm = TRUE))
   )
 )
-```
 
-```{r metrics-table}
 kable(
   metrics_table,
-  caption = "Resumen de Métricas Principales",
+  caption = "Resumen de Métricas Principales - Fondo Risky Norris",
   align = c("l", "r")
 )
 ```
 
-## 5. Evaluación como Fondo de Alto Riesgo
+## 5. Evaluación de Riesgo
 
 ```{r risk-assessment}
-# Benchmarks típicos para fondos de alto riesgo
-high_risk_vol_range <- c(15, 25)
-
-risk_assessment <- case_when(
-  current_annual_vol < high_risk_vol_range[1] ~
-    "MENOR al esperado para alto riesgo",
-  current_annual_vol > high_risk_vol_range[2] ~
-    "MAYOR al esperado para alto riesgo",
-  TRUE ~ "CONSISTENTE con alto riesgo"
+# Evaluación de riesgo basada en volatilidad
+risk_description <- case_when(
+  current_annual_vol < 15 ~ "BAJA",
+  current_annual_vol < 25 ~ "MODERADA-ALTA",
+  current_annual_vol < 35 ~ "ALTA",
+  TRUE ~ "MUY ALTA"
 )
 
 # Crear tabla de evaluación de riesgo
 risk_table <- data.frame(
   Aspecto = c(
-    "Volatilidad Anualizada Actual (%)",
-    "Rango Esperado Alto Riesgo (%)",
-    "Evaluación del Riesgo",
+    "Volatilidad Anualizada (%)",
+    "Clasificación de Volatilidad",
     "Días con Movimientos Significativos",
-    "Frecuencia de Volatilidad Alta"
+    "Frecuencia de Alta Volatilidad",
+    "Ratio Sharpe",
+    "Drawdown Máximo (%)"
   ),
   Resultado = c(
     sprintf("%.1f", current_annual_vol),
-    sprintf("%.0f - %.0f", high_risk_vol_range[1], high_risk_vol_range[2]),
-    risk_assessment,
+    risk_description,
     sprintf("%.1f%% del período", significant_moves / nrow(df_analysis) * 100),
     ifelse(
-      current_annual_vol > 20,
+      current_annual_vol > 25,
       "ALTA",
-      ifelse(current_annual_vol > 15, "MODERADA-ALTA", "MODERADA")
-    )
+      ifelse(current_annual_vol > 15, "MODERADA", "BAJA")
+    ),
+    sprintf("%.2f", sharpe_approx),
+    sprintf("%.2f", abs(max_drawdown))
   )
 )
-```
 
-```{r risk-table}
 kable(
   risk_table,
-  caption = "Evaluación de Riesgo del Fondo",
+  caption = "Evaluación de Riesgo del Fondo Risky Norris",
   align = c("l", "l")
 )
 ```
@@ -338,12 +473,12 @@ kable(
 
 ```{r monthly-analysis}
 # Crear tabla de análisis mensual
-monthly_summary <- vol_periods |>
+monthly_summary <- vol_periods %>%
   mutate(
     month_name = format(month, "%b %Y"),
     monthly_vol = round(monthly_vol, 2),
     monthly_return = round(monthly_return, 2)
-  ) |>
+  ) %>%
   select(
     Mes = month_name,
     `Retorno Mensual (%)` = monthly_return,
@@ -352,23 +487,26 @@ monthly_summary <- vol_periods |>
 
 kable(
   monthly_summary,
-  caption = "Análisis de Performance Mensual",
+  caption = "Análisis de Performance Mensual - Fondo Risky Norris",
   align = c("l", "r", "r")
 )
 ```
 
-## 7. Conclusiones
+## 7. Conclusiones para Análisis
 
-### Tendencia General
-El fondo presenta una tendencia **`r trend_direction`** durante el período analizado, con un retorno total de **`r sprintf("%.2f%%", total_return)`**.
+### Resumen de Performance
+- **Retorno Total**: `r sprintf("%.2f%%", total_return)`
+- **Tendencia General**: **`r trend_direction`**
+- **Volatilidad**: `r sprintf("%.1f%%", current_annual_vol)` anualizada (**`r risk_description`**)
 
-### Volatilidad
-- La volatilidad anualizada de **`r sprintf("%.1f%%", current_annual_vol)`** es **`r tolower(risk_assessment)`**
-- Se observaron **`r significant_moves`** días con movimientos superiores al 2%
+### Características de Riesgo
+- **Ratio Sharpe**: `r sprintf("%.2f", sharpe_approx)` (indica `r ifelse(sharpe_approx > 1, "buena", ifelse(sharpe_approx > 0.5, "moderada", "baja"))` relación riesgo-retorno)
+- **Drawdown Máximo**: `r sprintf("%.2f%%", abs(max_drawdown))`
+- **Días Volátiles**: `r sprintf("%.1f%%", significant_moves/nrow(df_analysis)*100)` del período
 
-### Comportamiento de Riesgo
-El fondo exhibe características `r ifelse(current_annual_vol > 20, "de alto riesgo", ifelse(current_annual_vol > 15, "de riesgo moderado-alto", "de riesgo moderado"))`, con una distribución de retornos que refleja la naturaleza volátil esperada para este tipo de instrumentos.
+### Perfil del Fondo
+El **Fundo Risky Norris** muestra características de `r ifelse(current_annual_vol > 25, "alto riesgo", ifelse(current_annual_vol > 15, "riesgo moderado-alto", "riesgo moderado"))` con una volatilidad anualizada de `r sprintf("%.1f%%", current_annual_vol)`.
 
 ---
 
-*Análisis generado el `r format(Sys.Date(), "%d de %B de %Y")`*
+*Análisis generado el `r format(Sys.Date(), "%d de %B de %Y")` por Paulo Villarroel*
