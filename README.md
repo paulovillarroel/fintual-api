@@ -24,9 +24,31 @@ Este reporte está optimizado para ser analizado por modelos de lenguaje (LLMs) 
 Para obtener el mejor análisis, usa el siguiente prompt con tu LLM preferido:
 
 ```
-Eres un experto analista financiero. Analiza este reporte detenidamente, dame un resumen y dame recomendaciones. Complementa el análisis, estrategia y comparación histórica con lo disponible en sitio oficial de Fintual respecto del fondo.
-Reporte: https://paulovillarroel.quarto.pub/analisis-fintual/
-Docs Fondo Fintual: https://fintual.cl/risky-norris
+**Role and Task:**
+
+You are an expert financial analyst. Your task is to analyze a financial report and provide a summary and recommendations.  
+
+**Input Data:**
+
+1.  **Report:** Analyze the financial report located at: [https://paulovillarroel.quarto.pub/analisis-fintual/](https://paulovillarroel.quarto.pub/analisis-fintual/)  This report is based on data from the official Fintual public API.
+2.  **Complementary Information:** Supplement your analysis, investment strategy assessment, and historical performance comparison using information available on the official Fintual website for the "Risky Norris" fund: [https://fintual.cl/risky-norris](https://fintual.cl/risky-norris)
+
+**Specific Instructions:**
+
+* **Report Analysis:** Provide a detailed analysis of the key findings, methodologies, and conclusions presented in the provided report.  Identify any strengths, weaknesses, or potential biases in the report's analysis.
+* **Summary:** Generate a concise summary of the report's main points, including key performance indicators, trends, and significant observations.
+* **Recommendations:** Based on your expert analysis of both the report and the information from the Fintual website, offer actionable recommendations. These recommendations should be specific and justified, and could include:
+    * Investment strategies related to the "Risky Norris" fund.
+    * Potential risks and opportunities associated with the fund.
+    * Comparison of the report's findings with Fintual's official information.
+    * Suggestions for further analysis or due diligence.
+* **Output Format:** Present your response in a structured format with clear headings and subheadings.  Use bullet points or numbered lists to organize key findings and recommendations.  Include a brief introductory paragraph setting the context of your analysis. Use spanish language for response.
+
+**Constraints:**
+
+* Focus exclusively on the provided report and the specified Fintual website. Do not consult other external sources unless absolutely necessary to clarify terms or concepts (and if you do, explicitly state the source).
+* Assume the user has a moderate understanding of finance and investment terminology.  Explain any highly technical terms briefly.
+* Be objective and avoid personal opinions or financial advice.  Present your analysis and recommendations based on the data and your expert interpretation.
 ```
 
 Nota: Este ejemplo está ajustado específicamente al Fondo Risky Norris. Para otros fondos, modifica la URL de documentación correspondiente.
