@@ -1,0 +1,374 @@
+---
+title: "Análisis Fintual - Valor Cuota y Riesgo"
+subtitle: "Fondo Risky Norris"
+author: "Paulo Villarroel"
+date: "`r Sys.Date()`"
+lang: es
+format: 
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    fig-width: 10
+    fig-height: 6
+    embed-resources: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(lubridate)
+library(gridExtra)
+library(knitr)
+
+```
+
+## Resumen Ejecutivo
+
+Este análisis examina la evolución del valor cuota de un fondo de Fintual (para **Risky Norris**: casi solamente ETFs accionarios) durante el período analizado, evaluando su rendimiento, volatilidad y comportamiento como instrumento de alto riesgo.
+
+```{r load-data}
+# Cargar datos desde archivo externo
+source("api-req.R")
+
+# Verificar que los datos se cargaron correctamente
+if (!exists("df") || !is.data.frame(df)) {
+  stop("Error: No se pudo cargar el dataframe 'df' desde api-req.R")
+}
+
+cat(
+  "Período de análisis:",
+  format(as.Date(start_date), "%d/%m/%Y"),
+  "al",
+  format(as.Date(end_date), "%d/%m/%Y"),
+  "\n"
+)
+```
+
+
+
+```{r data-prep}
+# Calcular métricas de análisis
+df_analysis <- df |>
+  arrange(date) |>
+  mutate(
+    # Retornos diarios
+    daily_return = (price - lag(price)) / lag(price) * 100,
+    # Retorno acumulado
+    cumulative_return = (price / first(price) - 1) * 100,
+    # Media móvil 7 días
+    ma_7 = zoo::rollmean(price, k = 7, fill = NA, align = "right"),
+    # Media móvil 30 días
+    ma_30 = zoo::rollmean(price, k = 30, fill = NA, align = "right"),
+    # Volatilidad móvil (7 días)
+    volatility_7d = zoo::rollapply(
+      daily_return,
+      7,
+      sd,
+      fill = NA,
+      align = "right",
+      na.rm = TRUE
+    )
+  )
+
+# Métricas clave
+start_price <- first(df_analysis$price, na_rm = TRUE)
+end_price <- last(df_analysis$price, na_rm = TRUE)
+total_return <- (end_price / start_price - 1) * 100
+avg_daily_return <- mean(df_analysis$daily_return, na.rm = TRUE)
+volatility <- sd(df_analysis$daily_return, na.rm = TRUE)
+sharpe_approx <- avg_daily_return / volatility * sqrt(252)
+max_price <- max(df_analysis$price, na.rm = TRUE)
+min_price <- min(df_analysis$price, na.rm = TRUE)
+max_drawdown <- min(df_analysis$cumulative_return, na.rm = TRUE)
+```
+
+## 1. Evolución del Valor Cuota
+
+```{r price-evolution, fig.cap="Evolución del valor cuota con medias móviles y tendencia general"}
+ggplot(df_analysis, aes(x = date, y = price)) +
+  geom_line(color = "#2E86AB", size = 1.2, alpha = 0.8) +
+  geom_line(
+    aes(y = ma_7),
+    color = "#A23B72",
+    size = 0.8,
+    alpha = 0.7,
+    linetype = "dashed"
+  ) +
+  geom_line(
+    aes(y = ma_30),
+    color = "#F18F01",
+    size = 0.8,
+    alpha = 0.7,
+    linetype = "dotted"
+  ) +
+  geom_smooth(
+    method = "lm",
+    color = "#C73E1D",
+    size = 0.8,
+    alpha = 0.3,
+    se = TRUE
+  ) +
+  scale_y_continuous(labels = scales::comma_format()) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(
+    title = "Evolución del Valor Cuota",
+    subtitle = paste0("Período: ", min(df$date), " - ", max(df$date)),
+    x = "Fecha",
+    y = "Valor Cuota (CLP)",
+    caption = "Líneas: Precio (azul), MA 7 días (rosado), MA 30 días (naranja), Tendencia (rojo)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## 2. Análisis de Retornos
+
+### 2.1 Retornos Diarios
+
+```{r daily-returns, fig.cap="Retornos diarios del fondo"}
+ggplot(df_analysis, aes(x = date, y = daily_return)) +
+  geom_hline(yintercept = 0, color = "gray50", linetype = "dashed") +
+  geom_col(aes(fill = daily_return > 0), alpha = 0.7) +
+  scale_fill_manual(values = c("TRUE" = "#27AE60", "FALSE" = "#E74C3C")) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(
+    title = "Retornos Diarios",
+    x = "Fecha",
+    y = "Retorno Diario (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+```
+
+### 2.2 Retorno Acumulado
+
+```{r cumulative-returns, fig.cap="Evolución del retorno acumulado"}
+ggplot(df_analysis, aes(x = date, y = cumulative_return)) +
+  geom_hline(yintercept = 0, color = "gray50", linetype = "dashed") +
+  geom_line(color = "#8E44AD", size = 1.2) +
+  geom_area(alpha = 0.2, fill = "#8E44AD") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(
+    title = "Retorno Acumulado",
+    x = "Fecha",
+    y = "Retorno Acumulado (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## 3. Análisis de Volatilidad
+
+### 3.1 Distribución de Retornos
+
+```{r returns-distribution, fig.cap="Distribución de los retornos diarios"}
+ggplot(df_analysis, aes(x = daily_return)) +
+  geom_histogram(bins = 30, fill = "#34495E", alpha = 0.7, color = "white") +
+  geom_vline(
+    xintercept = avg_daily_return,
+    color = "#E67E22",
+    size = 1,
+    linetype = "dashed"
+  ) +
+  geom_vline(xintercept = 0, color = "gray50", linetype = "dashed") +
+  labs(
+    title = "Distribución de Retornos Diarios",
+    x = "Retorno Diario (%)",
+    y = "Frecuencia",
+    caption = "Línea naranja: Media de retornos"
+  ) +
+  theme_minimal()
+```
+
+### 3.2 Volatilidad Móvil
+
+```{r volatility-evolution, fig.cap="Evolución de la volatilidad móvil (7 días)"}
+ggplot(df_analysis, aes(x = date, y = volatility_7d)) +
+  geom_line(color = "#E74C3C", size = 1) +
+  geom_smooth(method = "loess", color = "#3498DB", alpha = 0.3) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  labs(
+    title = "Volatilidad Móvil (7 días)",
+    x = "Fecha",
+    y = "Volatilidad (%)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## 4. Métricas Clave
+
+```{r metrics-calculation}
+# Cálculo de métricas adicionales
+lm_model <- lm(price ~ as.numeric(date), data = df_analysis)
+slope_daily <- coef(lm_model)[2]
+slope_monthly <- slope_daily * 30
+trend_direction <- ifelse(slope_daily > 0, "ALCISTA", "BAJISTA")
+
+# Análisis de volatilidad por períodos
+vol_periods <- df_analysis |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(month) |>
+  summarise(
+    monthly_vol = sd(daily_return, na.rm = TRUE),
+    monthly_return = (last(price) / first(price) - 1) * 100,
+    .groups = "drop"
+  )
+
+avg_monthly_vol <- mean(vol_periods$monthly_vol, na.rm = TRUE)
+current_annual_vol <- volatility * sqrt(252)
+
+# Días con movimientos significativos
+significant_moves <- df_analysis |>
+  filter(abs(daily_return) > 2) |>
+  nrow()
+
+# Crear tabla de métricas
+metrics_table <- data.frame(
+  Métrica = c(
+    "Valor Inicial (CLP)",
+    "Valor Final (CLP)",
+    "Retorno Total (%)",
+    "Retorno Promedio Diario (%)",
+    "Volatilidad Diaria (%)",
+    "Volatilidad Anualizada (%)",
+    "Ratio Sharpe Aproximado",
+    "Máximo Drawdown (%)",
+    "Tendencia General",
+    "Cambio Promedio Mensual (CLP)",
+    "Días con Movimientos >2%"
+  ),
+  Valor = c(
+    format(round(start_price), big.mark = ","),
+    format(round(end_price), big.mark = ","),
+    sprintf("%.2f", total_return),
+    sprintf("%.3f", avg_daily_return),
+    sprintf("%.3f", volatility),
+    sprintf("%.2f", current_annual_vol),
+    sprintf("%.2f", sharpe_approx),
+    sprintf("%.2f", max_drawdown),
+    trend_direction,
+    sprintf("%.2f", slope_monthly),
+    sprintf(
+      "%d de %d (%.1f%%)",
+      significant_moves,
+      nrow(df_analysis),
+      significant_moves / nrow(df_analysis) * 100
+    )
+  )
+)
+```
+
+```{r metrics-table}
+kable(
+  metrics_table,
+  caption = "Resumen de Métricas Principales",
+  align = c("l", "r")
+)
+```
+
+## 5. Evaluación como Fondo de Alto Riesgo
+
+```{r risk-assessment}
+# Benchmarks típicos para fondos de alto riesgo
+high_risk_vol_range <- c(15, 25)
+
+risk_assessment <- case_when(
+  current_annual_vol < high_risk_vol_range[1] ~
+    "MENOR al esperado para alto riesgo",
+  current_annual_vol > high_risk_vol_range[2] ~
+    "MAYOR al esperado para alto riesgo",
+  TRUE ~ "CONSISTENTE con alto riesgo"
+)
+
+# Crear tabla de evaluación de riesgo
+risk_table <- data.frame(
+  Aspecto = c(
+    "Volatilidad Anualizada Actual (%)",
+    "Rango Esperado Alto Riesgo (%)",
+    "Evaluación del Riesgo",
+    "Días con Movimientos Significativos",
+    "Frecuencia de Volatilidad Alta"
+  ),
+  Resultado = c(
+    sprintf("%.1f", current_annual_vol),
+    sprintf("%.0f - %.0f", high_risk_vol_range[1], high_risk_vol_range[2]),
+    risk_assessment,
+    sprintf("%.1f%% del período", significant_moves / nrow(df_analysis) * 100),
+    ifelse(
+      current_annual_vol > 20,
+      "ALTA",
+      ifelse(current_annual_vol > 15, "MODERADA-ALTA", "MODERADA")
+    )
+  )
+)
+```
+
+```{r risk-table}
+kable(
+  risk_table,
+  caption = "Evaluación de Riesgo del Fondo",
+  align = c("l", "l")
+)
+```
+
+## 6. Análisis Mensual
+
+```{r monthly-analysis}
+# Crear tabla de análisis mensual
+monthly_summary <- vol_periods |>
+  mutate(
+    month_name = format(month, "%b %Y"),
+    monthly_vol = round(monthly_vol, 2),
+    monthly_return = round(monthly_return, 2)
+  ) |>
+  select(
+    Mes = month_name,
+    `Retorno Mensual (%)` = monthly_return,
+    `Volatilidad Mensual (%)` = monthly_vol
+  )
+
+kable(
+  monthly_summary,
+  caption = "Análisis de Performance Mensual",
+  align = c("l", "r", "r")
+)
+```
+
+## 7. Conclusiones
+
+### Tendencia General
+El fondo presenta una tendencia **`r trend_direction`** durante el período analizado, con un retorno total de **`r sprintf("%.2f%%", total_return)`**.
+
+### Volatilidad
+- La volatilidad anualizada de **`r sprintf("%.1f%%", current_annual_vol)`** es **`r tolower(risk_assessment)`**
+- Se observaron **`r significant_moves`** días con movimientos superiores al 2%
+
+### Comportamiento de Riesgo
+El fondo exhibe características `r ifelse(current_annual_vol > 20, "de alto riesgo", ifelse(current_annual_vol > 15, "de riesgo moderado-alto", "de riesgo moderado"))`, con una distribución de retornos que refleja la naturaleza volátil esperada para este tipo de instrumentos.
+
+---
+
+*Análisis generado el `r format(Sys.Date(), "%d de %B de %Y")`*

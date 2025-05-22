@@ -1,0 +1,4 @@
+- source: reporte.qmd
+  quarto-pub:
+    - id: 1c1d82d5-5209-402b-a313-3cf423544857
+      url: https://paulovillarroel.quarto.pub/analisis-fintual
