@@ -157,7 +157,7 @@ MIT License - ver [LICENSE](LICENSE) para más detalles.
 
 - **Autor**: Paulo Villarroel
 - **Email**: paulo@hazlacondatos.com
-- **LinkedIn**: [tu-perfil](https://linkedin.com/in/paulovillarroel)
+- **LinkedIn**: [Perfil](https://linkedin.com/in/paulovillarroel)
 
 ---
 
