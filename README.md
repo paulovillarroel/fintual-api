@@ -13,7 +13,7 @@ Análisis automatizado de fondos de inversión de Fintual utilizando su API púb
 ## 📁 Estructura del Proyecto
 
 ```
-fintual-analysis/
+fintual-api/
 ├── README.md
 ├── api-req.R           # Script para obtener datos de la API
 ├── reporte.qmd         # Documento Quarto principal
